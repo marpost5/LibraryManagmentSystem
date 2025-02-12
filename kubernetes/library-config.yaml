@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: library-config
-data:
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://library-db-service.library-namespace.svc.cluster.local:5432/LibraryDB"
-  SPRING_DATASOURCE_USERNAME: "postgres"

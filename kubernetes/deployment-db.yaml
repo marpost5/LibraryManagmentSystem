@@ -1,37 +1,40 @@
 apiVersion: v1
-kind: ConfigMap
+kind: Namespace
 metadata:
-  name: library-db-config
-data:
-  POSTGRES_DB: LibraryDB
-  POSTGRES_USER: postgres
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: library-db-secret
-type: Opaque
-data:
-  POSTGRES_PASSWORD: dnNlbGVuYTE=
+  name: library-namespace
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: library-db-pvc
+  namespace: library-namespace
 spec:
-  storageClassName: local-path
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: library-db-service
+  namespace: library-namespace
+spec:
+  selector:
+    app: library-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: library-db
+  namespace: library-namespace
 spec:
-  serviceName: library-db-service
   replicas: 1
   selector:
     matchLabels:
@@ -42,34 +45,43 @@ spec:
         app: library-db
     spec:
       containers:
-        - name: postgres
+        - name: library-db
           image: postgres:15
-          envFrom:
-            - configMapRef:
-                name: library-db-config
+          ports:
+            - containerPort: 5432
           env:
+            - name: POSTGRES_USER
+              value: "postgres"
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: library-db-secret
-                  key: POSTGRES_PASSWORD
-          ports:
-            - containerPort: 5432
+                  name: library-secret
+                  key: SPRING_DATASOURCE_PASSWORD
+            - name: POSTGRES_DB
+              value: "LibraryDB"
           volumeMounts:
-            - name: library-db-data
+            - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+              subPath: postgres
       volumes:
-        - name: library-db-data
+        - name: postgres-storage
           persistentVolumeClaim:
             claimName: library-db-pvc
 ---
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: library-db-service
-spec:
-  selector:
-    app: library-db
-  ports:
-    - port: 5432
-      targetPort: 5432
+  name: library-config
+  namespace: library-namespace
+data:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://library-db-service.library-namespace.svc.cluster.local:5432/LibraryDB"
+  SPRING_DATASOURCE_USERNAME: "postgres"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: library-secret
+  namespace: library-namespace
+type: Opaque
+data:
+  SPRING_DATASOURCE_PASSWORD: dnNlbGVuYTE=

@@ -2,11 +2,14 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: library-ingress
+  namespace: library-namespace
   annotations:
     ingress.kubernetes.io/ssl-redirect: "false"
 spec:
+  ingressClassName: traefik
   rules:
-    - http:
+    - host: library.local
+      http:
         paths:
           - path: /
             pathType: Prefix
